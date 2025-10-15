@@ -1,5 +1,5 @@
 -- SCRIPT OPTIMASI UNTUK PERANGKAT LOW-END (RAM 2GB)
--- Letakkan script ini di StarterPlayer > StarterPlayerScripts
+-- Letakkan script ini di StarterPlayer > StarterPlayerScripts LocalScript
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
