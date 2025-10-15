@@ -1,5 +1,5 @@
--- SCRIPT OPTIMASI UNTUK PERANGKAT LOW-END (RAM 2GB)
--- Letakkan script ini di StarterPlayer > StarterPlayerScripts LocalScript
+-- LOCALSCRIPT
+-- Letakkan script ini di StarterPlayer > StarterPlayerScripts
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -26,23 +26,50 @@ local CONFIG = {
 
 -- ========== FUNGSI OPTIMASI GRAFIS ==========
 local function OptimizeGraphics()
-	-- Set rendering quality ke low
-	settings().Rendering.QualityLevel = Enum.QualityLevel.Level01
+	-- Set rendering quality ke low (hanya bisa diakses dari client)
+	local success, err = pcall(function()
+		local UserSettings = UserSettings()
+		local GameSettings = UserSettings:GetService("UserGameSettings")
+		GameSettings.SavedQualityLevel = Enum.SavedQualitySetting.QualityLevel1
+	end)
 	
 	if CONFIG.REDUCE_SHADOWS then
 		-- Matikan global shadows
-		game:GetService("Lighting").GlobalShadows = false
+		local lighting = game:GetService("Lighting")
+		lighting.GlobalShadows = false
+		lighting.EnvironmentDiffuseScale = 0
+		lighting.EnvironmentSpecularScale = 0
 	end
-	
-	-- Set performance stats
-	game:GetService("UserInputService").MouseIconEnabled = true
 end
 
 -- ========== FUNGSI RENDER DISTANCE ==========
 local objectStates = {} -- Menyimpan state original objek
 
+-- Daftar nama part yang TIDAK boleh disembunyikan
+local PROTECTED_NAMES = {
+	"Baseplate", "Floor", "Ground", "Spawn", "SpawnLocation",
+	"Base", "Platform", "Terrain"
+}
+
+local function IsProtected(obj)
+	-- Cek apakah part dilindungi
+	for _, name in pairs(PROTECTED_NAMES) do
+		if string.find(string.lower(obj.Name), string.lower(name)) then
+			return true
+		end
+	end
+	-- Jangan sembunyikan SpawnLocation
+	if obj:IsA("SpawnLocation") then
+		return true
+	end
+	return false
+end
+
 local function UpdateObjectVisibility(obj, distance)
 	if not obj or not obj:IsA("BasePart") then return end
+	
+	-- Jangan modify part yang dilindungi
+	if IsProtected(obj) then return end
 	
 	-- Simpan state original
 	if not objectStates[obj] then
