@@ -1,5 +1,6 @@
--- LOCALSCRIPT
+-- LOCALSCRIPT - FIXED VERSION
 -- Letakkan script ini di StarterPlayer > StarterPlayerScripts
+-- REPLACE script LowEndOptimization yang lama
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -13,10 +14,10 @@ local CONFIG = {
 	-- Jarak render (dalam studs)
 	RENDER_DISTANCE = 150, -- Jarak render objek (lebih kecil = lebih smooth)
 	DETAIL_DISTANCE = 80,  -- Jarak detail tinggi
-	
+
 	-- Update interval (dalam detik)
 	UPDATE_INTERVAL = 0.5, -- Seberapa sering mengecek jarak
-	
+
 	-- Optimasi tambahan
 	REDUCE_PARTICLES = true,    -- Kurangi partikel
 	REDUCE_SHADOWS = true,       -- Matikan bayangan
@@ -32,7 +33,7 @@ local function OptimizeGraphics()
 		local GameSettings = UserSettings:GetService("UserGameSettings")
 		GameSettings.SavedQualityLevel = Enum.SavedQualitySetting.QualityLevel1
 	end)
-	
+
 	if CONFIG.REDUCE_SHADOWS then
 		-- Matikan global shadows
 		local lighting = game:GetService("Lighting")
@@ -48,7 +49,7 @@ local objectStates = {} -- Menyimpan state original objek
 -- Daftar nama part yang TIDAK boleh disembunyikan
 local PROTECTED_NAMES = {
 	"Baseplate", "Floor", "Ground", "Spawn", "SpawnLocation",
-	"Base", "Platform", "Terrain"
+	"Base", "Platform", "Terrain", "gali" -- TAMBAH "gali" AGAR TIDAK DISEMBUNYIKAN
 }
 
 local function IsProtected(obj)
@@ -67,10 +68,10 @@ end
 
 local function UpdateObjectVisibility(obj, distance)
 	if not obj or not obj:IsA("BasePart") then return end
-	
+
 	-- Jangan modify part yang dilindungi
 	if IsProtected(obj) then return end
-	
+
 	-- Simpan state original
 	if not objectStates[obj] then
 		objectStates[obj] = {
@@ -79,30 +80,30 @@ local function UpdateObjectVisibility(obj, distance)
 			material = obj.Material,
 		}
 	end
-	
+
 	local state = objectStates[obj]
-	
+
 	if distance > CONFIG.RENDER_DISTANCE then
 		-- Terlalu jauh - sembunyikan sepenuhnya
 		obj.Transparency = 1
 		obj.CanCollide = false
 		obj.CastShadow = false
-		
+
 	elseif distance > CONFIG.DETAIL_DISTANCE then
 		-- Jauh - render sederhana
 		obj.Transparency = state.transparency
 		obj.CanCollide = true
 		obj.CastShadow = false
-		
+
 		-- Ganti material kompleks dengan sederhana
 		if CONFIG.REDUCE_TEXTURES then
 			if obj.Material == Enum.Material.Fabric or 
-			   obj.Material == Enum.Material.Granite or
-			   obj.Material == Enum.Material.Marble then
+				obj.Material == Enum.Material.Granite or
+				obj.Material == Enum.Material.Marble then
 				obj.Material = Enum.Material.SmoothPlastic
 			end
 		end
-		
+
 	else
 		-- Dekat - render penuh
 		obj.Transparency = state.transparency
@@ -110,7 +111,7 @@ local function UpdateObjectVisibility(obj, distance)
 		obj.CastShadow = not CONFIG.REDUCE_SHADOWS
 		obj.Material = state.material
 	end
-	
+
 	-- Optimasi partikel
 	if CONFIG.REDUCE_PARTICLES then
 		for _, child in pairs(obj:GetChildren()) do
@@ -138,21 +139,21 @@ local function UpdateRenderDistance()
 		return
 	end
 	lastUpdate = now
-	
+
 	local character = player.Character
 	if not character then return end
-	
+
 	local rootPart = character:FindFirstChild("HumanoidRootPart")
 	if not rootPart then return end
-	
+
 	local playerPos = rootPart.Position
-	
+
 	-- Loop semua objek di workspace
 	for _, obj in pairs(Workspace:GetDescendants()) do
 		if obj:IsA("BasePart") and obj ~= rootPart then
 			-- Hitung jarak
 			local distance = (obj.Position - playerPos).Magnitude
-			
+
 			-- Update visibility
 			UpdateObjectVisibility(obj, distance)
 		end
@@ -162,10 +163,17 @@ end
 -- ========== OPTIMASI TERRAIN ==========
 local function OptimizeTerrain()
 	if not CONFIG.SIMPLIFY_TERRAIN then return end
-	
+
 	local terrain = Workspace:FindFirstChildOfClass("Terrain")
 	if terrain then
-		terrain.Decoration = false
+		-- PERBAIKAN: Decoration sudah deprecated, gunakan properti lain
+		pcall(function()
+			-- Set WaterWaveSize ke 0 untuk optimasi
+			terrain.WaterWaveSize = 0
+			terrain.WaterWaveSpeed = 0
+			terrain.WaterReflectance = 0
+			terrain.WaterTransparency = 1
+		end)
 	end
 end
 
@@ -174,16 +182,22 @@ local function CleanupMemory()
 	-- Bersihkan cache setiap 30 detik
 	while true do
 		wait(30)
-		
-		-- Force garbage collection
-		game:GetService("RunService"):Set3dRenderingEnabled(true)
-		
+
+		-- PERBAIKAN: Set3dRenderingEnabled tidak bisa dipanggil dari LocalScript
+		-- Hapus baris ini karena butuh RobloxScript capability
+		-- game:GetService("RunService"):Set3dRenderingEnabled(true)
+
 		-- Cleanup unused objects
 		for obj, state in pairs(objectStates) do
 			if not obj or not obj.Parent then
 				objectStates[obj] = nil
 			end
 		end
+
+		-- Force garbage collection dengan cara yang aman
+		pcall(function()
+			collectgarbage("collect")
+		end)
 	end
 end
 
@@ -196,9 +210,3 @@ spawn(CleanupMemory)
 
 -- Connect ke RenderStepped untuk update realtime
 RunService.RenderStepped:Connect(UpdateRenderDistance)
-
--- Info untuk player
-print("=================================")
-print("LOW-END OPTIMIZATION LOADED")
-print("Render Distance: " .. CONFIG.RENDER_DISTANCE)
-print("=================================")
